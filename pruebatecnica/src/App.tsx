@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 import { UsersLists } from "./components/UsersList";
-import { User } from "./types";
+import { SortBy, User } from "./types.d";
+
 
 function App() {
   const [users, setUsers] = useState<User[]>([]);
   const [showColors, setShowColors] = useState(false);
-  const [sortByContry, setSortByContry] = useState(false);
+  const [sorting, setSorting] = useState<SortBy>(SortBy.NONE);
   const [filteredCountry, setFilteredCountry] = useState<string | null>(null);
   const originalUsers = useRef<User[]>([]);
 
@@ -15,7 +16,8 @@ function App() {
   };
 
   const toggleSortByCountry = () => {
-    setSortByContry((prevState) => !prevState);
+    const newSortingValue = sorting === SortBy.NONE ? SortBy.COUNTRY : SortBy.NONE;
+    setSorting(newSortingValue);
   };
 
   const handleDelete = (email: string) => {
@@ -26,6 +28,11 @@ function App() {
   const handleReset = () => {
     setUsers(originalUsers.current);
   };
+
+  const handleChangeSort = (sort: SortBy)=>{
+    setSorting(sort);
+
+  }
 
   useEffect(() => {
     fetch("https://randomuser.me/api?results=100")
@@ -50,12 +57,19 @@ function App() {
   }, [users, filteredCountry])
 
   const sortedUsers = useMemo(() => {
-    return sortByContry
-      ? filteredUsers.toSorted((a, b) =>
-          a.location.country.localeCompare(b.location.country)
-        )
-      : filteredUsers;
-  }, [filteredUsers, sortByContry]);
+    if (sorting === SortBy.NONE) {
+      return filteredUsers;
+    }
+    const compareProperties: Record<string, (user: User)=> any>={
+      [SortBy.NAME]: (user) => user.name.first,
+      [SortBy.LAST]: (user) => user.name.last,
+      [SortBy.COUNTRY]: (user) => user.location.country,
+    }
+    return filteredUsers.toSorted((a, b) => {
+      const extractProperty = compareProperties[sorting];
+      return extractProperty(a).localeCompare(extractProperty(b));
+    })
+  }, [filteredUsers, sorting]);
 
   return (
     <>
@@ -63,7 +77,7 @@ function App() {
       <header>
         <button onClick={toggleColors}>Colorear Filas</button>
         <button onClick={toggleSortByCountry}>
-          {sortByContry ? "No ordenar por pais" : "Ordenar por pais"}
+          {sorting === SortBy.COUNTRY ? "No ordenar por pais" : "Ordenar por pais"}
         </button>
         <button onClick={handleReset}>Resetear estado</button>
         <input
@@ -75,6 +89,7 @@ function App() {
       </header>
       <main>
         <UsersLists
+          changeSorting={handleChangeSort}
           deleteUser={handleDelete}
           showColors={showColors}
           users={sortedUsers}
